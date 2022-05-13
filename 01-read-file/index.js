@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { stdout, stderr } = require('process');
 
 let text = '';
 
@@ -7,10 +8,10 @@ const dataListener = (chunk) => {
   text += chunk;
 };
 const errorListener = (error) => {
-  console.error(`error reading file: ${error}`);
+  stderr.write(`error reading file: ${error}`);
 };
 const endListener = () => {
-  console.log(text);
+  stdout.write(text);
 };
 
 const fullName = path.join(__dirname, 'text.txt');
