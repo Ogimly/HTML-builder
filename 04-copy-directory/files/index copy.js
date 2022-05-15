@@ -1,7 +1,7 @@
 const fsPromises = require('fs/promises');
 // const fs = require('fs');
 const path = require('path');
-const { stderr } = require('process');
+const { stdout, stderr } = require('process');
 
 async function copyFiles(pathSrc, pathDest) {
   try {
@@ -18,7 +18,7 @@ async function copyFiles(pathSrc, pathDest) {
           stderr.write(`Error copy file: ${err}`);
         }
       } else {
-        copyDir(pathSrcNew, pathDestNew);
+        copyFiles(pathSrcNew, pathDestNew);
       }
     }
   } catch (err) {
@@ -44,4 +44,13 @@ async function copyDir(dirSrc, dirDest) {
 const dirSrc = path.join(__dirname, 'files');
 const dirDest = path.join(__dirname, 'files-copy');
 
-copyDir(dirSrc, dirDest);
+async function start() {
+  try {
+    await copyDir(dirSrc, dirDest);
+    stdout.write('Directory copying finished. Thank you!');
+  } catch (err) {
+    stderr.write('Error! ');
+  }
+}
+
+start();

@@ -1,7 +1,7 @@
 const fsPromises = require('fs/promises');
-// const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
-const { stderr } = require('process');
+const { stdout, stderr } = require('process');
 
 async function copyFiles(pathSrc, pathDest) {
   try {
@@ -15,14 +15,14 @@ async function copyFiles(pathSrc, pathDest) {
         try {
           await fsPromises.copyFile(pathSrcNew, pathDestNew);
         } catch (err) {
-          stderr.write(`Error copy file: ${err}`);
+          stderr.write(`Error copy file ${pathSrc}: ${err}`);
         }
       } else {
-        copyDir(pathSrcNew, pathDestNew);
+        copyFiles(pathSrcNew, pathDestNew);
       }
     }
   } catch (err) {
-    stderr.write(`Error reading dir: ${err}`);
+    stderr.write(`Error reading dir ${pathSrc}: ${err}`);
   }
 }
 async function copyDir(dirSrc, dirDest) {
@@ -34,10 +34,10 @@ async function copyDir(dirSrc, dirDest) {
 
       copyFiles(dirSrc, dirDest);
     } catch (err) {
-      stderr.write(`Error creating dir: ${err}`);
+      stderr.write(`Error creating dir ${dirDest}: ${err}`);
     }
   } catch (err) {
-    stderr.write(`Error removing dir: ${err}`);
+    stderr.write(`Error removing dir ${dirDest}: ${err}`);
   }
 }
 
