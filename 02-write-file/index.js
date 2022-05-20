@@ -4,15 +4,17 @@ const process = require('process');
 const { stdin: input, stdout: output } = require('process');
 const readline = require('readline');
 
+const cp = require('child_process');
+
 const lineListener = (input) => {
-  if (input === 'exit') {
+  if (input.trim().toLowerCase() === 'exit') {
     process.exit();
   } else {
     streamWrite.write(input + '\r\n');
   }
 };
 const exitListener = () => {
-  output.write('Yours text in text.txt. Thank you!');
+  output.write('Your text in text.txt. Thank you!');
   rl.close();
 };
 
@@ -21,8 +23,22 @@ const rl = readline.createInterface({ input, output });
 const fullName = path.join(__dirname, 'text.txt');
 const streamWrite = fs.createWriteStream(fullName, 'utf-8');
 
-output.write('Enter text to write to file:');
+cp.exec('git --version', (err, stdout) => {
+  if (err) {
+    output.write(err);
+  }
+  if (stdout.trim().toLowerCase() === 'git version 2.35.1.windows.2')
+    output.write(
+      'Your ' +
+        stdout +
+        'If you are using Git Bash, update your version, please) Or you can use another terminal' +
+        '\r\n'
+    );
 
-rl.on('line', lineListener);
+  output.write('Enter text to write to file:');
 
-process.on('exit', exitListener);
+  rl.on('line', lineListener);
+
+  process.on('exit', exitListener);
+  process.on('SIGINT', exitListener);
+});
