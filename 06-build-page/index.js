@@ -9,83 +9,53 @@ const dirAssets = path.join(__dirname, 'assets');
 const dirDistAssets = path.join(dirDist, 'assets');
 
 const dirStyles = path.join(__dirname, 'styles');
-const fileStyle = path.join(dirDist, 'style.css');
+const fileStyle = 'style.css';
 
 const dirComponents = path.join(__dirname, 'components');
 const fileTemplate = path.join(__dirname, 'template.html');
 const fileIndex = path.join(dirDist, 'index.html');
 
-const promises = [];
-const components = [];
+async function mergeStyles(dirSrc, dirDist, styleFileName) {
+  const fullName = path.join(dirDist, styleFileName);
+  const streamWrite = fs.createWriteStream(fullName, 'utf-8');
 
-async function mergeStyles(dirSrc, fileStyle) {
-  try {
-    const streamWrite = fs.createWriteStream(fileStyle, 'utf-8');
+  const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
 
-    const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
+  for (const file of files) {
+    if (file.isFile()) {
+      const fileName = path.join(dirSrc, file.name);
 
-    for (const file of files) {
-      if (file.isFile()) {
-        const fullName = path.join(dirSrc, file.name);
+      if (path.extname(fileName) === '.css') {
+        const streamRead = fs.createReadStream(fileName, 'utf-8');
 
-        let ext = path.extname(fullName);
-        if (ext === '.css') {
-          let text = '';
-          const streamRead = fs.createReadStream(fullName, 'utf-8');
-
-          streamRead.on('data', (chunk) => (text += chunk));
-          streamRead.on('error', (err) => stderr.write(`Error reading file: ${err}`));
-          streamRead.on('end', () => {
-            streamWrite.write(text);
-            stdout.write(`merge ${file.name} -> ${fileStyle}` + '\r\n');
-          });
-        }
+        stdout.write(`merge ${fileName} -> ${fullName}\r\n`);
+        streamRead.pipe(streamWrite);
       }
     }
-  } catch (err) {
-    stderr.write(`Error: ${err}`);
   }
+  return true;
 }
 
-async function copyFiles(pathSrc, pathDest) {
-  try {
-    const files = await fsPromises.readdir(pathSrc, { withFileTypes: true });
+const copyDir = async (dirSrc, dirDest) => {
+  await fsPromises.rm(dirDest, { recursive: true, force: true });
+  await fsPromises.mkdir(dirDest, { recursive: true });
 
-    for (const file of files) {
-      let pathSrcNew = path.join(pathSrc, file.name);
-      let pathDestNew = path.join(pathDest, file.name);
+  const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
 
-      stdout.write(`copy ${file.name} -> ${pathDestNew}` + '\r\n');
+  for (const file of files) {
+    let pathSrcNew = path.join(dirSrc, file.name);
+    let pathDestNew = path.join(dirDest, file.name);
 
-      if (file.isFile()) {
-        try {
-          await fsPromises.copyFile(pathSrcNew, pathDestNew);
-        } catch (err) {
-          stderr.write(`Error copy file: ${err}`);
-        }
-      } else {
-        copyDir(pathSrcNew, pathDestNew);
-      }
+    if (file.isFile()) {
+      stdout.write(`copy ${pathSrcNew} -> ${pathDestNew}\r\n`);
+      await fsPromises.copyFile(pathSrcNew, pathDestNew);
+    } else {
+      stdout.write(`copy dir ${pathSrcNew} -> ${pathDestNew}\r\n`);
+      await copyDir(pathSrcNew, pathDestNew);
     }
-  } catch (err) {
-    stderr.write(`Error reading dir: ${err}`);
   }
-}
-async function copyDir(dirSrc, dirDest) {
-  try {
-    await fsPromises.rm(dirDest, { recursive: true, force: true });
-
-    try {
-      await fsPromises.mkdir(dirDest, { recursive: true });
-
-      copyFiles(dirSrc, dirDest);
-    } catch (err) {
-      stderr.write(`Error creating dir: ${err}`);
-    }
-  } catch (err) {
-    stderr.write(`Error removing dir: ${err}`);
-  }
-}
+  return true;
+};
 
 async function readComponent(fullName) {
   return new Promise((resolve, reject) => {
@@ -95,7 +65,7 @@ async function readComponent(fullName) {
     streamRead.on('data', (chunk) => (text += chunk));
     streamRead.on('error', (err) => reject(err));
     streamRead.on('end', () => {
-      resolve({ name: path.basename(fullName, '.html'), text: text });
+      resolve({ name: path.basename(fullName, '.html'), text: text + '\r\n' });
     });
   });
 }
@@ -107,66 +77,55 @@ async function writeHTML(text, components, fileIndex) {
 
   const streamWrite = fs.createWriteStream(fileIndex, 'utf-8');
   streamWrite.write(text);
-  stdout.write(`build ${fileIndex}` + '\r\n');
+  stdout.write(`build ${fileIndex}\r\n`);
 }
 
 async function buildHTML(fileTemplate, dirComponents, fileIndex) {
-  try {
-    const files = await fsPromises.readdir(dirComponents, { withFileTypes: true });
-    for (const file of files) {
-      if (file.isFile()) {
-        const fullName = path.join(dirComponents, file.name);
+  const promises = [];
+  const files = await fsPromises.readdir(dirComponents, { withFileTypes: true });
 
-        let ext = path.extname(fullName);
-        if (ext === '.html') {
-          try {
-            promises.push(readComponent(fullName));
-          } catch (err) {
-            stderr.write(`Error reading components: ${err}`);
-          }
-        }
-      }
+  for (const file of files) {
+    if (file.isFile()) {
+      const fullName = path.join(dirComponents, file.name);
+
+      if (path.extname(fullName) === '.html') promises.push(readComponent(fullName));
     }
-
-    Promise.allSettled(promises).then((results) => {
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          components.push(result.value);
-        } else {
-          stderr.write(`Error reading components: ${result.reason}`);
-        }
-      });
-
-      const streamRead = fs.createReadStream(fileTemplate, 'utf-8');
-      let text = '';
-
-      streamRead.on('data', (chunk) => (text += chunk));
-      streamRead.on('error', (error) => stderr.write(`error reading file: ${error}`));
-      streamRead.on('end', () => writeHTML(text, components, fileIndex));
-    });
-  } catch (err) {
-    stderr.write(`Error reading dir: ${err}`);
   }
+  const components = await Promise.all(promises);
+
+  const streamRead = fs.createReadStream(fileTemplate, 'utf-8');
+  let text = '';
+
+  streamRead.on('data', (chunk) => (text += chunk));
+  streamRead.on('error', (error) => {
+    throw error;
+  });
+  streamRead.on('end', () => writeHTML(text, components, fileIndex));
 }
 
 async function webpack() {
-  try {
-    await fsPromises.rm(dirDist, { recursive: true, force: true });
+  await fsPromises.rm(dirDist, { recursive: true, force: true });
+  await fsPromises.mkdir(dirDist, { recursive: true });
 
-    try {
-      await fsPromises.mkdir(dirDist, { recursive: true });
+  const results = await Promise.allSettled([
+    buildHTML(fileTemplate, dirComponents, fileIndex),
+    copyDir(dirAssets, dirDistAssets),
+    mergeStyles(dirStyles, dirDist, fileStyle),
+  ]);
 
-      await buildHTML(fileTemplate, dirComponents, fileIndex);
-
-      await copyDir(dirAssets, dirDistAssets);
-
-      await mergeStyles(dirStyles, fileStyle);
-    } catch (err) {
-      stderr.write(`Error creating dir: ${err}`);
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      throw result.reason;
     }
-  } catch (err) {
-    stderr.write(`Error removing dir: ${err}`);
-  }
+  });
+  return true;
 }
 
-webpack();
+(async () => {
+  try {
+    await webpack();
+    stdout.write('Done. New build in ' + dirDist);
+  } catch (err) {
+    stderr.write('Failed. ' + err);
+  }
+})();
