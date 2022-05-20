@@ -7,34 +7,34 @@ const dirSrc = path.join(__dirname, 'styles');
 const dirDist = path.join(__dirname, 'project-dist');
 const styleFileName = 'bundle.css';
 
-async function mergeStyles() {
-  try {
-    const fullName = path.join(dirDist, styleFileName);
-    const streamWrite = fs.createWriteStream(fullName, 'utf-8');
+async function mergeStyles(dirSrc, dirDist, styleFileName) {
+  const fullName = path.join(dirDist, styleFileName);
 
-    const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
+  const streamWrite = fs.createWriteStream(fullName, 'utf-8');
 
-    for (const file of files) {
-      if (file.isFile()) {
-        const fullName = path.join(dirSrc, file.name);
+  const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
 
-        let ext = path.extname(fullName);
-        if (ext === '.css') {
-          let text = '';
-          const streamRead = fs.createReadStream(fullName, 'utf-8');
+  for (const file of files) {
+    if (file.isFile()) {
+      const fullName = path.join(dirSrc, file.name);
 
-          streamRead.on('data', (chunk) => (text += chunk));
-          streamRead.on('error', (error) => stderr.write(`error reading file: ${error}`));
-          streamRead.on('end', () => {
-            streamWrite.write(text);
-            stdout.write(`${file.name} -> ${styleFileName}` + '\r\n');
-          });
-        }
+      let ext = path.extname(fullName);
+      if (ext === '.css') {
+        const streamRead = fs.createReadStream(fullName, 'utf-8');
+
+        stdout.write(`${file.name} -> ${styleFileName}\r\n`);
+        streamRead.pipe(streamWrite);
       }
     }
-  } catch (err) {
-    stderr.write(`Error: ${err}`);
   }
+  return true;
 }
 
-mergeStyles();
+(async () => {
+  try {
+    await mergeStyles(dirSrc, dirDist, styleFileName);
+    stdout.write('Done. New styles file is ' + path.join(dirDist, styleFileName));
+  } catch (err) {
+    stderr.write('Failed. ' + err);
+  }
+})();
