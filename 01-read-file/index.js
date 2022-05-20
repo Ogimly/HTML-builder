@@ -20,3 +20,9 @@ const streamRead = fs.createReadStream(fullName, 'utf-8');
 streamRead.on('data', dataListener);
 streamRead.on('error', errorListener);
 streamRead.on('end', endListener);
+
+// use pipe()
+// const fullName = path.join(__dirname, 'text.txt');
+// const streamRead = fs.createReadStream(fullName, 'utf-8');
+//
+// streamRead.pipe(stdout);
