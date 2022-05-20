@@ -1,47 +1,36 @@
 const fsPromises = require('fs/promises');
-// const fs = require('fs');
 const path = require('path');
-const { stderr } = require('process');
+const { stdout, stderr } = require('process');
 
-async function copyFiles(pathSrc, pathDest) {
-  try {
-    const files = await fsPromises.readdir(pathSrc, { withFileTypes: true });
+const copyDir = async (dirSrc, dirDest) => {
+  await fsPromises.rm(dirDest, { recursive: true, force: true });
+  await fsPromises.mkdir(dirDest, { recursive: true });
 
-    for (const file of files) {
-      let pathSrcNew = path.join(pathSrc, file.name);
-      let pathDestNew = path.join(pathDest, file.name);
+  const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
 
-      if (file.isFile()) {
-        try {
-          await fsPromises.copyFile(pathSrcNew, pathDestNew);
-        } catch (err) {
-          stderr.write(`Error copy file: ${err}`);
-        }
-      } else {
-        copyDir(pathSrcNew, pathDestNew);
-      }
+  for (const file of files) {
+    let pathSrcNew = path.join(dirSrc, file.name);
+    let pathDestNew = path.join(dirDest, file.name);
+
+    if (file.isFile()) {
+      // stdout.write(`copy ${pathSrcNew} -> ${pathDestNew}\r\n`);
+      await fsPromises.copyFile(pathSrcNew, pathDestNew);
+    } else {
+      // stdout.write(`copy dir ${pathSrcNew} -> ${pathDestNew}\r\n`);
+      await copyDir(pathSrcNew, pathDestNew);
     }
-  } catch (err) {
-    stderr.write(`Error reading dir: ${err}`);
   }
-}
-async function copyDir(dirSrc, dirDest) {
-  try {
-    await fsPromises.rm(dirDest, { recursive: true, force: true });
-
-    try {
-      await fsPromises.mkdir(dirDest, { recursive: true });
-
-      copyFiles(dirSrc, dirDest);
-    } catch (err) {
-      stderr.write(`Error creating dir: ${err}`);
-    }
-  } catch (err) {
-    stderr.write(`Error removing dir: ${err}`);
-  }
-}
+  return true;
+};
 
 const dirSrc = path.join(__dirname, 'files');
 const dirDest = path.join(__dirname, 'files-copy');
 
-copyDir(dirSrc, dirDest);
+(async () => {
+  try {
+    await copyDir(dirSrc, dirDest);
+    stdout.write('Done. New directory is ' + dirDest);
+  } catch (err) {
+    stderr.write('Failed. ' + err);
+  }
+})();
