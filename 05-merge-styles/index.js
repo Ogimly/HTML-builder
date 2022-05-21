@@ -7,7 +7,14 @@ const dirSrc = path.join(__dirname, 'styles');
 const dirDist = path.join(__dirname, 'project-dist');
 const styleFileName = 'bundle.css';
 
-async function mergeStyles(dirSrc, dirDist, styleFileName) {
+// node 04-copy-directory -с off||on
+// default value 'on' -> true
+const commentStatus = () => {
+  const index = process.argv.indexOf('-c');
+  return index === -1 ? true : !(process.argv[index + 1] === 'off');
+};
+
+const mergeStyles = async (dirSrc, dirDist, styleFileName, commentStatus = true) => {
   const fullName = path.join(dirDist, styleFileName);
 
   const streamWrite = fs.createWriteStream(fullName, 'utf-8');
@@ -16,23 +23,22 @@ async function mergeStyles(dirSrc, dirDist, styleFileName) {
 
   for (const file of files) {
     if (file.isFile()) {
-      const fullName = path.join(dirSrc, file.name);
+      const fileName = path.join(dirSrc, file.name);
 
-      let ext = path.extname(fullName);
-      if (ext === '.css') {
-        const streamRead = fs.createReadStream(fullName, 'utf-8');
+      if (path.extname(fileName) === '.css') {
+        const streamRead = fs.createReadStream(fileName, 'utf-8');
 
-        stdout.write(`${file.name} -> ${styleFileName}\r\n`);
+        if (commentStatus) stdout.write(`merge ${fileName} -> ${fullName}\r\n`);
         streamRead.pipe(streamWrite);
       }
     }
   }
   return true;
-}
+};
 
 (async () => {
   try {
-    await mergeStyles(dirSrc, dirDist, styleFileName);
+    await mergeStyles(dirSrc, dirDist, styleFileName, commentStatus());
     stdout.write('Done. New styles file is ' + path.join(dirDist, styleFileName));
   } catch (err) {
     stderr.write('Failed. ' + err);

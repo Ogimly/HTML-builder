@@ -15,8 +15,16 @@ const dirComponents = path.join(__dirname, 'components');
 const fileTemplate = path.join(__dirname, 'template.html');
 const fileIndex = path.join(dirDist, 'index.html');
 
-async function mergeStyles(dirSrc, dirDist, styleFileName) {
+// node 04-copy-directory -с off||on
+// default value 'on' -> true
+const commentStatus = () => {
+  const index = process.argv.indexOf('-c');
+  return index === -1 ? true : !(process.argv[index + 1] === 'off');
+};
+
+const mergeStyles = async (dirSrc, dirDist, styleFileName, commentStatus = true) => {
   const fullName = path.join(dirDist, styleFileName);
+
   const streamWrite = fs.createWriteStream(fullName, 'utf-8');
 
   const files = await fsPromises.readdir(dirSrc, { withFileTypes: true });
@@ -28,15 +36,15 @@ async function mergeStyles(dirSrc, dirDist, styleFileName) {
       if (path.extname(fileName) === '.css') {
         const streamRead = fs.createReadStream(fileName, 'utf-8');
 
-        stdout.write(`merge ${fileName} -> ${fullName}\r\n`);
+        if (commentStatus) stdout.write(`merge ${fileName} -> ${fullName}\r\n`);
         streamRead.pipe(streamWrite);
       }
     }
   }
   return true;
-}
+};
 
-const copyDir = async (dirSrc, dirDest) => {
+const copyDir = async (dirSrc, dirDest, commentStatus = true) => {
   await fsPromises.rm(dirDest, { recursive: true, force: true });
   await fsPromises.mkdir(dirDest, { recursive: true });
 
@@ -47,11 +55,11 @@ const copyDir = async (dirSrc, dirDest) => {
     let pathDestNew = path.join(dirDest, file.name);
 
     if (file.isFile()) {
-      stdout.write(`copy ${pathSrcNew} -> ${pathDestNew}\r\n`);
+      if (commentStatus) stdout.write(`copy ${pathSrcNew} -> ${pathDestNew}\r\n`);
       await fsPromises.copyFile(pathSrcNew, pathDestNew);
     } else {
-      stdout.write(`copy dir ${pathSrcNew} -> ${pathDestNew}\r\n`);
-      await copyDir(pathSrcNew, pathDestNew);
+      if (commentStatus) stdout.write(`copy dir ${pathSrcNew} -> ${pathDestNew}\r\n`);
+      await copyDir(pathSrcNew, pathDestNew, commentStatus);
     }
   }
   return true;
@@ -70,17 +78,17 @@ async function readComponent(fullName) {
   });
 }
 
-async function writeHTML(text, components, fileIndex) {
+async function writeHTML(text, components, fileIndex, commentStatus = true) {
   components.forEach((component) => {
     text = text.split(`{{${component.name}}}`).join(component.text);
   });
 
   const streamWrite = fs.createWriteStream(fileIndex, 'utf-8');
   streamWrite.write(text);
-  stdout.write(`build ${fileIndex}\r\n`);
+  if (commentStatus) stdout.write(`build ${fileIndex}\r\n`);
 }
 
-async function buildHTML(fileTemplate, dirComponents, fileIndex) {
+async function buildHTML(fileTemplate, dirComponents, fileIndex, commentStatus = true) {
   const promises = [];
   const files = await fsPromises.readdir(dirComponents, { withFileTypes: true });
 
@@ -100,17 +108,17 @@ async function buildHTML(fileTemplate, dirComponents, fileIndex) {
   streamRead.on('error', (error) => {
     throw error;
   });
-  streamRead.on('end', () => writeHTML(text, components, fileIndex));
+  streamRead.on('end', () => writeHTML(text, components, fileIndex, commentStatus));
 }
 
-async function webpack() {
+async function webpack(commentStatus = true) {
   await fsPromises.rm(dirDist, { recursive: true, force: true });
   await fsPromises.mkdir(dirDist, { recursive: true });
 
   const results = await Promise.allSettled([
-    buildHTML(fileTemplate, dirComponents, fileIndex),
-    copyDir(dirAssets, dirDistAssets),
-    mergeStyles(dirStyles, dirDist, fileStyle),
+    buildHTML(fileTemplate, dirComponents, fileIndex, commentStatus),
+    copyDir(dirAssets, dirDistAssets, commentStatus),
+    mergeStyles(dirStyles, dirDist, fileStyle, commentStatus),
   ]);
 
   results.forEach((result) => {
@@ -123,7 +131,7 @@ async function webpack() {
 
 (async () => {
   try {
-    await webpack();
+    await webpack(commentStatus());
     stdout.write('Done. New build in ' + dirDist);
   } catch (err) {
     stderr.write('Failed. ' + err);
