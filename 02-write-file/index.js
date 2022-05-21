@@ -27,7 +27,7 @@ cp.exec('git --version', (err, stdout) => {
   if (err) {
     output.write(err);
   }
-  if (stdout.trim().toLowerCase() === 'git version 2.35.1.windows.2')
+  if (stdout.trim().toLowerCase().slice(0, 16) === 'git version 2.35')
     output.write(
       'Your ' +
         stdout +
